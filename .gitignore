@@ -1,0 +1,14 @@
+# build output
+PeekBar.app/
+*.app/
+
+# private signing key — NEVER commit
+peekbar-codesign.p12
+*.p12
+*.pem
+
+# icon intermediates (AppIcon.icns is the committed asset)
+AppIcon.iconset/
+icon-1024.png
+
+.DS_Store
