@@ -29,11 +29,20 @@ func axChildren(_ el: AXUIElement, _ attr: String) -> [AXUIElement] {
 
 struct Icon { let label: String; let element: AXUIElement; let app: NSRunningApplication; let system: Bool }
 
+// Menu bar extras we never want to list (noise / not actionable here).
+let hiddenBundleIDs: Set<String> = [
+    "com.apple.controlcenter",       // Control Center
+    "com.apple.Spotlight",           // Spotlight
+    "com.apple.TextInputMenuAgent",  // input-source menu
+    "com.google.Chrome",             // Chrome
+]
+
 func enumerateIcons() -> [Icon] {
     var result: [Icon] = []
     for app in NSWorkspace.shared.runningApplications {
         let pid = app.processIdentifier
         if pid <= 0 { continue }
+        if let bid = app.bundleIdentifier, hiddenBundleIDs.contains(bid) { continue }
         let appName = app.localizedName ?? "?"
         let system = app.bundleIdentifier?.hasPrefix("com.apple.") ?? false
         let axApp = AXUIElementCreateApplication(pid)
@@ -70,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTe
         _ = AXIsProcessTrustedWithOptions(opts)
 
         setupLoginItem()
+        buildMenu()
         buildWindow()
         registerHotKey()
         NotificationCenter.default.addObserver(self, selector: #selector(toggle), name: .peekbarToggle, object: nil)
@@ -84,6 +94,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTe
         if UserDefaults.standard.bool(forKey: key) { return }
         do { try SMAppService.mainApp.register(); UserDefaults.standard.set(true, forKey: key) }
         catch { NSLog("PeekBar: login-item register failed: \(error)") }
+    }
+
+    // Minimal app menu so ⌘Q / the menu bar can quit PeekBar.
+    func buildMenu() {
+        let mainMenu = NSMenu()
+        let appItem = NSMenuItem()
+        mainMenu.addItem(appItem)
+        let appMenu = NSMenu()
+        let name = ProcessInfo.processInfo.processName
+        appMenu.addItem(withTitle: "Quit \(name)",
+                        action: #selector(NSApplication.terminate(_:)),
+                        keyEquivalent: "q")
+        appItem.submenu = appMenu
+        NSApp.mainMenu = mainMenu
     }
 
     func buildWindow() {
