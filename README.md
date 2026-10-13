@@ -3,6 +3,13 @@
 Click any macOS menu bar icon — **even ones hidden under the notch** or pushed
 off the edge when the bar overflows.
 
+![PeekBar listing the menu bar icons, including one hidden under the notch](screenshot.png)
+
+For example, when the menu bar overflows, an icon like **OneDrive** gets pushed
+under the notch where you can't see or click it — PeekBar still lists it by name
+(along with its live status text, e.g. "OneDrive — OneDrive Processing …") and
+lets you open its menu.
+
 Menu-bar managers like Ice/Bartender solve overflow by drawing a second bar and
 screen-capturing your icons. PeekBar takes a simpler route: it uses the
 **Accessibility API** to list every menu bar icon by name and trigger it
@@ -51,6 +58,7 @@ cert is untrusted — that's expected and fine for local signing.
 | `make-cert.sh`  | create the stable signing identity        |
 | `gen-icon.swift`| render the app icon                       |
 | `AppIcon.icns`  | the built icon asset                      |
+| `screenshot.png`| the README screenshot                     |
 
 ## Notes
 
