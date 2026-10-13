@@ -54,10 +54,15 @@ func enumerateIcons() -> [Icon] {
 
 // MARK: - App
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTextFieldDelegate {
     var window: NSWindow!
     var stack: NSStackView!
-    var icons: [Icon] = []
+    var searchField: NSTextField!
+    var allIcons: [Icon] = []        // every enumerated icon
+    var icons: [Icon] = []           // the currently shown (filtered) subset
+    var rowViews: [NSView] = []      // one container view per shown row, for highlighting
+    var selectedIndex: Int = -1      // index into `icons` of the keyboard-selected row
+    var query: String = ""           // current filter text
     var hotKeyRef: EventHotKeyRef?
 
     func applicationDidFinishLaunching(_ note: Notification) {
@@ -91,8 +96,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         w.level = .floating
         w.center()
 
-        let scroll = NSScrollView(frame: w.contentView!.bounds)
-        scroll.autoresizingMask = [.width, .height]
+        let content = w.contentView!
+
+        // Search field — type to filter; also owns the keyboard (↑/↓ move, ⏎ clicks).
+        let search = NSTextField()
+        search.translatesAutoresizingMaskIntoConstraints = false
+        search.placeholderString = "Type to filter — ↑/↓ select, ⏎ open"
+        search.font = .systemFont(ofSize: 13)
+        search.isBezeled = true
+        search.bezelStyle = .roundedBezel
+        search.focusRingType = .none
+        search.delegate = self
+        content.addSubview(search)
+        searchField = search
+
+        let scroll = NSScrollView()
+        scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.hasVerticalScroller = true
         scroll.drawsBackground = false
 
@@ -107,9 +126,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         doc.translatesAutoresizingMaskIntoConstraints = false
         doc.addSubview(stack)
         scroll.documentView = doc
-        w.contentView!.addSubview(scroll)
+        content.addSubview(scroll)
 
         NSLayoutConstraint.activate([
+            search.topAnchor.constraint(equalTo: content.topAnchor, constant: 8),
+            search.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 10),
+            search.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -10),
+
+            scroll.topAnchor.constraint(equalTo: search.bottomAnchor, constant: 6),
+            scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            scroll.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+
             doc.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
             stack.leadingAnchor.constraint(equalTo: doc.leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: doc.trailingAnchor),
@@ -119,8 +147,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window = w
     }
 
+    // Re-scan every running app's menu bar extras, then rebuild the list.
+    func reloadIcons(preserveQuery: Bool = false) {
+        allIcons = enumerateIcons()
+        if !preserveQuery {
+            query = ""
+            searchField?.stringValue = ""
+        }
+        rebuildList()
+    }
+
+    // Apply the current filter to `allIcons` and lay out the matching rows.
     func rebuildList() {
-        icons = enumerateIcons()
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        icons = q.isEmpty ? allIcons : allIcons.filter { $0.label.lowercased().contains(q) }
+
+        // Keep a valid selection: first row by default, clamped to the new count.
+        if icons.isEmpty { selectedIndex = -1 }
+        else if selectedIndex < 0 || selectedIndex >= icons.count { selectedIndex = 0 }
+
+        rowViews.removeAll()
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for (i, icon) in icons.enumerated() {
             let label = NSButton(title: " " + icon.label, target: self, action: #selector(rowClicked(_:)))
@@ -153,32 +199,89 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             row.orientation = .horizontal
             row.distribution = .fill
             row.spacing = 8
+            row.edgeInsets = NSEdgeInsets(top: 2, left: 4, bottom: 2, right: 4)
+            row.wantsLayer = true
+            row.layer?.cornerRadius = 5
             row.translatesAutoresizingMaskIntoConstraints = false
             stack.addArrangedSubview(row)
             row.leadingAnchor.constraint(equalTo: stack.leadingAnchor, constant: 4).isActive = true
             row.trailingAnchor.constraint(equalTo: stack.trailingAnchor, constant: -4).isActive = true
+            rowViews.append(row)
+        }
+        updateSelectionHighlight()
+    }
+
+    // Paint the selected row and scroll it into view.
+    func updateSelectionHighlight() {
+        for (i, row) in rowViews.enumerated() {
+            row.layer?.backgroundColor = (i == selectedIndex)
+                ? NSColor.selectedContentBackgroundColor.cgColor
+                : NSColor.clear.cgColor
+        }
+        if selectedIndex >= 0, selectedIndex < rowViews.count {
+            let row = rowViews[selectedIndex]
+            row.scrollToVisible(row.bounds)
         }
     }
 
-    @objc func rowClicked(_ sender: NSButton) {
-        guard sender.tag >= 0, sender.tag < icons.count else { return }
-        let el = icons[sender.tag].element
+    // Move the keyboard selection by `delta`, clamped to the list.
+    func moveSelection(_ delta: Int) {
+        guard !icons.isEmpty else { return }
+        let next = max(0, min(icons.count - 1, selectedIndex + delta))
+        if next != selectedIndex {
+            selectedIndex = next
+            updateSelectionHighlight()
+        }
+    }
+
+    // Open the menu for icon at `index` (shared by clicks and the ⏎ key).
+    func performIcon(at index: Int) {
+        guard index >= 0, index < icons.count else { return }
+        let el = icons[index].element
         window.orderOut(nil)                                   // hide so the icon's menu is visible
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             _ = AXUIElementPerformAction(el, kAXPressAction as CFString)   // -25204 is benign
         }
     }
 
+    @objc func rowClicked(_ sender: NSButton) {
+        selectedIndex = sender.tag
+        performIcon(at: sender.tag)
+    }
+
     @objc func quitClicked(_ sender: NSButton) {
         guard sender.tag >= 0, sender.tag < icons.count else { return }
         icons[sender.tag].app.terminate()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.rebuildList() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.reloadIcons(preserveQuery: true)
+        }
+    }
+
+    // MARK: Keyboard — the search field owns the field editor; we intercept its keys.
+
+    func controlTextDidChange(_ note: Notification) {
+        query = searchField.stringValue
+        selectedIndex = 0                 // jump back to the top match on each edit
+        rebuildList()
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy sel: Selector) -> Bool {
+        switch sel {
+        case #selector(NSResponder.moveUp(_:)):      moveSelection(-1); return true
+        case #selector(NSResponder.moveDown(_:)):    moveSelection(1);  return true
+        case #selector(NSResponder.insertNewline(_:)):
+            performIcon(at: selectedIndex); return true
+        case #selector(NSResponder.cancelOperation(_:)):
+            window.orderOut(nil); return true
+        default: return false
+        }
     }
 
     func showWindow() {
-        rebuildList()
+        reloadIcons()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        window.makeFirstResponder(searchField)   // typing filters immediately
     }
 
     @objc func toggle() {

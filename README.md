@@ -9,12 +9,15 @@ screen-capturing your icons. PeekBar takes a simpler route: it uses the
 directly. Clicking a row opens that icon's menu in normal, visible screen space.
 
 - **No Screen Recording** — only the Accessibility permission.
-- No private APIs, no daemons, no network. ~200 lines of Swift, zero dependencies.
+- No private APIs, no daemons, no network. ~300 lines of Swift, zero dependencies.
 
 ## Features
 
 - A plain window listing every menu bar extra, each with its **app icon** and name.
 - Click a row → opens that icon's menu (works for icons hidden under the notch).
+- **Keyboard-driven**: start typing to filter the list to apps whose name
+  contains what you typed; **↑/↓** move the selection, **⏎** opens the selected
+  icon's menu (**esc** hides the window).
 - **Quit** button on each third-party row to quit that app (system items are left alone).
 - Global hotkey **⌘⌥M** to show/hide the window; also launchable from Spotlight/Dock.
 - Registers itself as a **login item** on first run (manage it in
