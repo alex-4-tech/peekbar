@@ -7,7 +7,10 @@ APP="PeekBar.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-swiftc -O main.swift -o "$APP/Contents/MacOS/PeekBar" \
+# Pin the deployment target: after an OS update swiftc can default minos to a
+# version newer than the running OS, and LaunchServices then refuses to open
+# the app (error -10825). Keep in sync with LSMinimumSystemVersion below.
+swiftc -O -target "$(uname -m)-apple-macos13.0" main.swift -o "$APP/Contents/MacOS/PeekBar" \
   -framework Cocoa -framework ApplicationServices -framework Carbon -framework ServiceManagement
 
 [ -f AppIcon.icns ] && cp AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
