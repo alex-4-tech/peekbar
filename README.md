@@ -26,7 +26,7 @@ directly. Clicking a row opens that icon's menu in normal, visible screen space.
   contains what you typed; **↑/↓** move the selection, **⏎** opens the selected
   icon's menu (**esc** hides the window).
 - **Quit** button on each third-party row to quit that app (system items are left alone).
-- Global hotkey **⌘⌥M** to show/hide the window; also launchable from Spotlight/Dock.
+- Global hotkey **⌘⌥M** to show/hide the window (also listed, as a reminder, in the app menu); also launchable from Spotlight/Dock.
 - Registers itself as a **login item** on first run (manage it in
   System Settings → General → Login Items).
 

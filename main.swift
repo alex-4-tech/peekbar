@@ -103,6 +103,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSTe
         mainMenu.addItem(appItem)
         let appMenu = NSMenu()
         let name = ProcessInfo.processInfo.processName
+        // No-op hint showing the global hotkey (action nil → shown disabled;
+        // the real hotkey is the Carbon one registered in registerHotKey()).
+        let hint = NSMenuItem(title: "Show/Hide PeekBar", action: nil, keyEquivalent: "m")
+        hint.keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(hint)
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit \(name)",
                         action: #selector(NSApplication.terminate(_:)),
                         keyEquivalent: "q")
